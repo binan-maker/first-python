@@ -36,8 +36,9 @@ def get_ai_answer(question: str) -> str:
     }
     
        # Updated to Groq's current, stable, production-ready model
+       # The most stable, battle-tested model on Groq's free tier
     payload = {
-        "model": "llama-3.3-70b-versatile",  # <-- CHANGE THIS LINE
+        "model": "mixtral-8x7b-32768",  # <-- CHANGE THIS LINE
         "messages": [
             {"role": "system", "content": "You are a helpful, concise AI assistant."},
             {"role": "user", "content": question}
