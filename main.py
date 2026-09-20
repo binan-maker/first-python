@@ -5,9 +5,10 @@ app = FastAPI()
 @app.get("/")
 def home():
     return {
-        "message": "Hello World! This is my first live Python app!",
+        "message": "I just updated my live app without touching the server!",
         "developer": "Zunzu",
-        "status": "LIVE ON THE INTERNET!"
+        "status": "AUTO-DEPLOYED VIA GITHUB!",
+        "next_goal": "Building a RAG AI System"
     }
 @app.get("/hello/{name}")
 def hello(name: str):
