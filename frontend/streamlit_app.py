@@ -12,7 +12,7 @@ current_dir = Path(__file__).parent
 config_path = current_dir / "config.yaml"
 
 # 1. Load the User Database
-with open('config_path') as file:
+with open(config_path) as file:
     config = yaml.load(file, Loader=SafeLoader)
 
 # 2. Initialize the Authenticator (The Bouncer)
