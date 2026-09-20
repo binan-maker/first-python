@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-import backend.database as database
-import models
+import database          # <-- FIXED: No "backend." prefix
+import models            # <-- FIXED: No "backend." prefix
 import requests
 import os
 
@@ -28,7 +28,6 @@ def get_db():
 def get_ai_answer(question: str) -> str:
     """Sends the question to Hugging Face AI and returns the answer"""
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    # Format the prompt for the Mistral model
     payload = {
         "inputs": f"<s>[INST] Answer this question clearly and concisely: {question} [/INST]",
         "parameters": {"max_new_tokens": 150, "temperature": 0.7}
@@ -36,9 +35,8 @@ def get_ai_answer(question: str) -> str:
     
     try:
         response = requests.post(HF_API_URL, headers=headers, json=payload)
-        response.raise_for_status() # Check for errors
+        response.raise_for_status()
         result = response.json()
-        # Extract the generated text from the response
         return result[0]["generated_text"].split("[/INST]")[-1].strip()
     except Exception as e:
         return f"AI is currently waking up or busy. (Error: {str(e)})"
@@ -53,10 +51,8 @@ def home():
 
 @app.post("/ask")
 def ask_question(prompt: PromptRequest, db: Session = Depends(get_db)):
-    # 1. Get the answer from the AI
     ai_answer = get_ai_answer(prompt.question)
     
-    # 2. Save BOTH the question and the AI's answer to PostgreSQL
     db_prompt = models.Prompt(
         question=prompt.question, 
         answer=ai_answer
@@ -74,6 +70,5 @@ def ask_question(prompt: PromptRequest, db: Session = Depends(get_db)):
 
 @app.get("/history")
 def get_history(db: Session = Depends(get_db)):
-    # Fetch all saved prompts from the database
     prompts = db.query(models.Prompt).all()
     return [{"id": p.id, "question": p.question, "answer": p.answer} for p in prompts]
