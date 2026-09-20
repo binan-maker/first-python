@@ -1,21 +1,15 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from openai import OpenAI
 import database
 import models
+import requests
 import os
 
 # Automatically create the database tables
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
-
-# Initialize Groq Client (Industry Standard)
-client = OpenAI(
-    base_url="https://api.groq.com/openai/v1",
-    api_key=os.environ.get("GROQ_API_KEY")
-)
 
 class PromptRequest(BaseModel):
     question: str
@@ -28,18 +22,27 @@ def get_db():
         db.close()
 
 def get_ai_answer(question: str) -> str:
-    """Sends the question to Groq AI and returns the answer"""
+    """Sends the question directly to Groq via HTTP"""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY')}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama3-8b-8192",
+        "messages": [
+            {"role": "system", "content": "You are a helpful, concise AI assistant."},
+            {"role": "user", "content": question}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 150
+    }
+    
     try:
-        response = client.chat.completions.create(
-            model="llama3-8b-8192",  # Lightning fast, free, and reliable
-            messages=[
-                {"role": "system", "content": "You are a helpful, concise AI assistant."},
-                {"role": "user", "content": question}
-            ],
-            temperature=0.7,
-            max_tokens=150
-        )
-        return response.choices[0].message.content
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
     except Exception as e:
         return f"AI is currently busy. (Error: {str(e)})"
 
