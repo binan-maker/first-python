@@ -3,11 +3,11 @@ credentials:
     admin:
       email: admin@zunzu.com
       name: Master Zunzu
-      password: $2b$12$KIXJw/5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5
+      password: "$2b$12$9sG2gHY4Jazk1lfqqgBudO6LrDXj5wQnbTeHsBIO73sl/qfzC2j.G"
     testuser:
       email: test@test.com
       name: Test User
-      password: $2b$12$KIXJw/5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5qZ5
+      password: "$2b$12$9sG2gHY4Jazk1lfqqgBudO6LrDXj5wQnbTeHsBIO73sl/qfzC2j.G"
 cookie:
   expiry_days: 30
   key: some_signature_key
