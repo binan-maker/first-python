@@ -3,9 +3,16 @@ import requests
 import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
+from pathlib import Path 
+
+
+# --- THE FIX: Find the config.yaml in the same folder as this script ---
+# Get the directory where streamlit_app.py is located
+current_dir = Path(__file__).parent
+config_path = current_dir / "config.yaml"
 
 # 1. Load the User Database
-with open('config.yaml') as file:
+with open('config_path') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
 # 2. Initialize the Authenticator (The Bouncer)
