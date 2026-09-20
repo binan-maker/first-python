@@ -37,7 +37,7 @@ def get_ai_answer(question: str) -> str:
     
     # Updated to Groq's most reliable, current free model
     payload = {
-        "model": "llama-3.1-8b-instant", 
+       "model": "llama3-8b-8192",
         "messages": [
             {"role": "system", "content": "You are a helpful, concise AI assistant."},
             {"role": "user", "content": question}
