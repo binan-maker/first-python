@@ -22,14 +22,14 @@ authenticator = stauth.Authenticate(
     config['cookie']['key'],
     config['cookie']['expiry_days'],
 )
+# 3. Create the Login Widget (New version syntax)
+authenticator.login(location='main')
 
-# 3. Create the Login Widget
-name, authentication_status, username = authenticator.login('Login', 'main')
-
-# 4. The Gate: If they are NOT logged in, show nothing but the login box
-if authentication_status:
+# 4. The Gate: Check the session state
+if st.session_state['authentication_status']:
     # --- EVERYTHING INSIDE HERE IS HIDDEN UNTIL THEY LOGIN ---
     authenticator.logout('Logout', 'sidebar')
+    name = st.session_state['name']
     
     API_URL = "https://first-python-q0wh.onrender.com" # Replace with your actual Render backend URL
 
@@ -56,7 +56,7 @@ if authentication_status:
         st.markdown("---")
         st.markdown("### 💎 Subscription Status")
         st.info("You are on the **Free Tier** (3 questions/day).")
-        st.markdown("[🚀 **Upgrade to Pro for $10/mo**](https://buy.stripe.com/test_aFa9ALgWi8bG2wS9ymaR200)")
+        st.markdown("[🚀 **Upgrade to Pro for $10/mo**](https://buy.stripe.com/YOUR_LINK_HERE)")
 
     # Initialize chat history
     if "messages" not in st.session_state:
@@ -86,7 +86,7 @@ if authentication_status:
                     st.error(error_msg)
                     st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
-elif authentication_status == False:
+elif st.session_state['authentication_status'] is False:
     st.error('Username/password is incorrect')
-elif authentication_status == None:
+elif st.session_state['authentication_status'] is None:
     st.warning('Please enter your username and password')
