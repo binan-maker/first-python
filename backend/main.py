@@ -35,9 +35,9 @@ def get_ai_answer(question: str) -> str:
         "Content-Type": "application/json"
     }
     
-    # Updated to Groq's most reliable, current free model
+       # Updated to Groq's current, stable, production-ready model
     payload = {
-       "model": "llama3-8b-8192",
+        "model": "llama-3.3-70b-versatile",  # <-- CHANGE THIS LINE
         "messages": [
             {"role": "system", "content": "You are a helpful, concise AI assistant."},
             {"role": "user", "content": question}
@@ -45,7 +45,6 @@ def get_ai_answer(question: str) -> str:
         "temperature": 0.7,
         "max_tokens": 150
     }
-    
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
         
