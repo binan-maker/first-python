@@ -56,7 +56,7 @@ if st.session_state['authentication_status']:
         st.markdown("---")
         st.markdown("### 💎 Subscription Status")
         st.info("You are on the **Free Tier** (3 questions/day).")
-        st.markdown("[🚀 **Upgrade to Pro for $10/mo**](https://buy.stripe.com/YOUR_LINK_HERE)")
+        st.markdown("[🚀 **Upgrade to Pro for $10/mo**](https://buy.stripe.com/test_aFa9ALgWi8bG2wS9ymaR200)")
 
     # Initialize chat history
     if "messages" not in st.session_state:
