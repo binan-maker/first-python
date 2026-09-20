@@ -13,7 +13,7 @@ app = FastAPI()
 
 # Get the Hugging Face token from Render's environment variables
 HF_TOKEN = os.environ.get("HF_TOKEN")
-HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 
 class PromptRequest(BaseModel):
     question: str
