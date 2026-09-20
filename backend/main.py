@@ -37,8 +37,9 @@ def get_ai_answer(question: str) -> str:
     
        # Updated to Groq's current, stable, production-ready model
        # The most stable, battle-tested model on Groq's free tier
+        # The newest, stable, free-tier model on Groq (as of Sept 2026)
     payload = {
-        "model": "mixtral-8x7b-32768",  # <-- CHANGE THIS LINE
+        "model": "openai/gpt-oss-20b",  # <-- CHANGE THIS LINE
         "messages": [
             {"role": "system", "content": "You are a helpful, concise AI assistant."},
             {"role": "user", "content": question}
