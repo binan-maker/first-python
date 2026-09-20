@@ -1,15 +1,25 @@
-from fastapi import FastAPI, Depends, HTTPException
+import os
+import requests
+import tempfile
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import database
 import models
-import requests
-import os
+import pypdf
+import chromadb
 
-# Automatically create the database tables
+# 1. Database Setup
 models.Base.metadata.create_all(bind=database.engine)
-
 app = FastAPI()
+
+# 2. ChromaDB Setup (Local Vector Database for RAG)
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+collection = chroma_client.get_or_create_collection(name="rag_documents")
+
+# 3. API Keys
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 class PromptRequest(BaseModel):
     question: str
@@ -21,62 +31,104 @@ def get_db():
     finally:
         db.close()
 
-def get_ai_answer(question: str) -> str:
-    """Sends the question directly to Groq via HTTP"""
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    api_key = os.environ.get("GROQ_API_KEY")
+def get_embedding(text: str):
+    """Converts text to a vector using Hugging Face free API"""
+    url = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    try:
+        response = requests.post(url, headers=headers, json={"inputs": text})
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Embedding error: {e}")
+        return []
+
+@app.post("/upload_pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
     
-    # Safety check: Make sure the key actually loaded
-    if not api_key or not api_key.startswith("gsk_"):
-        return "Error: GROQ_API_KEY is missing or invalid in Render settings."
+    # Save temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+    
+    try:
+        # Extract text from PDF
+        reader = pypdf.PdfReader(tmp_path)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        
+        # Chunk text into 500-character pieces
+        chunk_size = 500
+        chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+        
+        # Embed and store in ChromaDB
+        ids, documents, embeddings = [], [], []
+        for i, chunk in enumerate(chunks):
+            if len(chunk.strip()) < 50:
+                continue
+            emb = get_embedding(chunk)
+            if emb:
+                ids.append(f"chunk_{i}")
+                documents.append(chunk)
+                embeddings.append(emb)
+        
+        if ids:
+            collection.add(ids=ids, documents=documents, embeddings=embeddings)
+            
+        return {"message": f"Successfully processed {len(ids)} chunks from {file.filename}"}
+    finally:
+        os.remove(tmp_path)
+
+def get_ai_answer(question: str, context: str = "") -> str:
+    """Sends question to Groq, optionally with RAG context"""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    
+    system_prompt = "You are a helpful AI assistant."
+    if context:
+        system_prompt += f"\n\nUse the following context to answer the question. If the answer is not in the context, say 'I don't know based on the document.'\n\nContext:\n{context}"
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     
-       # Updated to Groq's current, stable, production-ready model
-       # The most stable, battle-tested model on Groq's free tier
-        # The newest, stable, free-tier model on Groq (as of Sept 2026)
     payload = {
-        "model": "openai/gpt-oss-20b",  # <-- CHANGE THIS LINE
+        "model": "openai/gpt-oss-20b", 
         "messages": [
-            {"role": "system", "content": "You are a helpful, concise AI assistant."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": question}
         ],
         "temperature": 0.7,
-        "max_tokens": 150
+        "max_tokens": 300
     }
+    
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
-        
-        # If it fails, print the EXACT reason Groq rejected it
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
         if response.status_code != 200:
             return f"Groq Error ({response.status_code}): {response.text}"
-        
         data = response.json()
         return data["choices"][0]["message"]["content"]
-        
     except Exception as e:
         return f"AI is currently busy. (Network Error: {str(e)})"
-@app.get("/")
-def home():
-    return {
-        "message": "Memory Connected! AI Brain Active (Powered by Groq)!",
-        "developer": "Zunzu",
-        "status": "Production Ready"
-    }
 
 @app.post("/ask")
 def ask_question(prompt: PromptRequest, db: Session = Depends(get_db)):
-    # 1. Get the answer from the reliable AI
-    ai_answer = get_ai_answer(prompt.question)
+    # 1. RAG: Search ChromaDB for relevant context
+    query_embedding = get_embedding(prompt.question)
+    context = ""
+    if query_embedding:
+        results = collection.query(query_embeddings=[query_embedding], n_results=2)
+        if results and results.get('documents'):
+            context = "\n\n".join(results['documents'][0])
     
-    # 2. Save BOTH the question and the AI's answer to PostgreSQL
-    db_prompt = models.Prompt(
-        question=prompt.question, 
-        answer=ai_answer
-    )
+    # 2. Get AI answer with the retrieved context
+    ai_answer = get_ai_answer(prompt.question, context)
+    
+    # 3. Save to PostgreSQL
+    db_prompt = models.Prompt(question=prompt.question, answer=ai_answer)
     db.add(db_prompt)
     db.commit()
     db.refresh(db_prompt)
@@ -85,7 +137,7 @@ def ask_question(prompt: PromptRequest, db: Session = Depends(get_db)):
         "id": db_prompt.id, 
         "question": db_prompt.question,
         "ai_answer": db_prompt.answer,
-        "status": "Saved to database and answered by AI!"
+        "status": "Answered with RAG!"
     }
 
 @app.get("/history")
