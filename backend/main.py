@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-import database          # <-- FIXED: No "backend." prefix
-import models            # <-- FIXED: No "backend." prefix
-import requests
+from openai import OpenAI
+import database
+import models
 import os
 
 # Automatically create the database tables
@@ -11,9 +11,11 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
-# Get the Hugging Face token from Render's environment variables
-HF_TOKEN = os.environ.get("HF_TOKEN")
-HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+# Initialize Groq Client (Industry Standard)
+client = OpenAI(
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.environ.get("GROQ_API_KEY")
+)
 
 class PromptRequest(BaseModel):
     question: str
@@ -26,33 +28,35 @@ def get_db():
         db.close()
 
 def get_ai_answer(question: str) -> str:
-    """Sends the question to Hugging Face AI and returns the answer"""
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {
-        "inputs": f"<s>[INST] Answer this question clearly and concisely: {question} [/INST]",
-        "parameters": {"max_new_tokens": 150, "temperature": 0.7}
-    }
-    
+    """Sends the question to Groq AI and returns the answer"""
     try:
-        response = requests.post(HF_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        return result[0]["generated_text"].split("[/INST]")[-1].strip()
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",  # Lightning fast, free, and reliable
+            messages=[
+                {"role": "system", "content": "You are a helpful, concise AI assistant."},
+                {"role": "user", "content": question}
+            ],
+            temperature=0.7,
+            max_tokens=150
+        )
+        return response.choices[0].message.content
     except Exception as e:
-        return f"AI is currently waking up or busy. (Error: {str(e)})"
+        return f"AI is currently busy. (Error: {str(e)})"
 
 @app.get("/")
 def home():
     return {
-        "message": "Memory Connected! AI Brain Active!",
+        "message": "Memory Connected! AI Brain Active (Powered by Groq)!",
         "developer": "Zunzu",
-        "status": "Phase 2 Complete"
+        "status": "Production Ready"
     }
 
 @app.post("/ask")
 def ask_question(prompt: PromptRequest, db: Session = Depends(get_db)):
+    # 1. Get the answer from the reliable AI
     ai_answer = get_ai_answer(prompt.question)
     
+    # 2. Save BOTH the question and the AI's answer to PostgreSQL
     db_prompt = models.Prompt(
         question=prompt.question, 
         answer=ai_answer
