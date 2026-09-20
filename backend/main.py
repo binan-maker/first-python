@@ -24,12 +24,20 @@ def get_db():
 def get_ai_answer(question: str) -> str:
     """Sends the question directly to Groq via HTTP"""
     url = "https://api.groq.com/openai/v1/chat/completions"
+    api_key = os.environ.get("GROQ_API_KEY")
+    
+    # Safety check: Make sure the key actually loaded
+    if not api_key or not api_key.startswith("gsk_"):
+        return "Error: GROQ_API_KEY is missing or invalid in Render settings."
+
     headers = {
-        "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY')}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
+    
+    # Updated to Groq's most reliable, current free model
     payload = {
-        "model": "llama3-8b-8192",
+        "model": "llama-3.1-8b-instant", 
         "messages": [
             {"role": "system", "content": "You are a helpful, concise AI assistant."},
             {"role": "user", "content": question}
@@ -40,12 +48,16 @@ def get_ai_answer(question: str) -> str:
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
-        response.raise_for_status()
+        
+        # If it fails, print the EXACT reason Groq rejected it
+        if response.status_code != 200:
+            return f"Groq Error ({response.status_code}): {response.text}"
+        
         data = response.json()
         return data["choices"][0]["message"]["content"]
+        
     except Exception as e:
-        return f"AI is currently busy. (Error: {str(e)})"
-
+        return f"AI is currently busy. (Network Error: {str(e)})"
 @app.get("/")
 def home():
     return {
