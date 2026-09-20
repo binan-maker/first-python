@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String
-from backend.database import Base
+from database import Base  # <-- FIXED: Removed "backend."
 
 class Prompt(Base):
     __tablename__ = "prompts"
